@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model Vehicle {
+  id          Int      @id @default(autoincrement())
+  displayName String   @map("display_name")
+  description String   @default("")
+  isArchived  Boolean  @default(false) @map("is_archived")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  odometerReadings VehicleOdometerReading[]
+  trips            Trip[]
+
+  @@map("vehicles")
+}
+
+model VehicleOdometerReading {
+  id                 Int      @id @default(autoincrement())
+  vehicleId          Int      @map("vehicle_id")
+  taxYear            Int      @map("tax_year")
+  odometerYearStart  Int?     @map("odometer_year_start")
+  odometerYearEnd    Int?     @map("odometer_year_end")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([vehicleId, taxYear], name: "uq_vehicle_tax_year")
+  @@map("vehicle_odometer_readings")
+}
+
+model TripCategory {
+  id          Int     @id @default(autoincrement())
+  code        String  @unique
+  displayName String  @map("display_name")
+  isDeductible Boolean @default(true) @map("is_deductible")
+
+  trips Trip[]
+
+  @@map("trip_categories")
+}
+
+model MileageRate {
+  id                 Int      @id @default(autoincrement())
+  categoryCode       String   @map("category_code")
+  rateCentsPerMile   Int      @map("rate_cents_per_mile")
+  effectiveStartDate DateTime @map("effective_start_date")
+  effectiveEndDate   DateTime @map("effective_end_date")
+
+  @@index([categoryCode])
+  @@map("mileage_rates")
+}
+
+model Trip {
+  id              Int      @id @default(autoincrement())
+  vehicleId       Int      @map("vehicle_id")
+  categoryId      Int      @map("category_id")
+  tripDate        DateTime @map("trip_date")
+  origin          String
+  destination     String
+  businessPurpose String   @map("business_purpose")
+  miles           Decimal
+  odometerStart   Int?     @map("odometer_start")
+  odometerEnd     Int?     @map("odometer_end")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  vehicle  Vehicle      @relation(fields: [vehicleId], references: [id])
+  category TripCategory @relation(fields: [categoryId], references: [id])
+  receipts Receipt[]
+
+  @@index([vehicleId])
+  @@index([categoryId])
+  @@index([tripDate])
+  @@map("trips")
+}
+
+model Receipt {
+  id               Int      @id @default(autoincrement())
+  tripId           Int      @map("trip_id")
+  originalFilename String   @map("original_filename")
+  contentType      String   @map("content_type")
+  byteSize         Int      @map("byte_size")
+  contentHash      String   @map("content_hash")
+  storagePath      String   @map("storage_path")
+  uploadedAt       DateTime @default(now()) @map("uploaded_at")
+
+  trip Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@map("receipts")
+}
+
+model AuditEvent {
+  id           Int      @id @default(autoincrement())
+  entityType   String   @map("entity_type")
+  entityId     Int      @map("entity_id")
+  action       String
+  fieldChanges String   @default("{}") @map("field_changes")
+  timestamp    DateTime @default(now())
+
+  @@index([entityType])
+  @@index([entityId])
+  @@map("audit_events")
+}
